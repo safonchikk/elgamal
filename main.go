@@ -93,7 +93,6 @@ func SignMessage(M string, keys KeyPair) (res Signature) {
 
 	t := new(big.Int)
 	t.Mul(keys.private, r)
-	//t.Mod(t, mod)
 	t.Sub(new(big.Int).SetBytes(h[:]), t)
 	t.Mod(t, mod)
 	t.Mul(t, k)
@@ -102,37 +101,6 @@ func SignMessage(M string, keys KeyPair) (res Signature) {
 
 	return res
 }
-
-/*func Verify(M string, key PublicKey, signature Signature) bool {
-	mod := new(big.Int)
-	mod.Sub(key.p, new(big.Int).SetInt64(1))
-
-	y := new(big.Int)
-	y.ModInverse(key.b, key.p)
-	s := new(big.Int)
-	s.ModInverse(signature.s, mod)
-
-	h := sha256.Sum256([]byte(M))
-
-	t := new(big.Int)
-	t.Mul(new(big.Int).SetBytes(h[:]), s)
-	t.Mod(t, mod)
-	u1 := t
-
-	t.Mul(signature.r, s)
-	t.Mod(t, mod)
-	u2 := t
-
-	u1.Exp(key.g, u1, key.p)
-	u2.Exp(y, u2, key.p)
-	t.Mul(u1, u2)
-	t.Mod(t, key.p)
-
-	fmt.Println(t)
-	fmt.Println(signature.r)
-
-	return t.Cmp(signature.r) == 0
-}*/
 
 func Verify(M string, key PublicKey, signature Signature) bool {
 	h := sha256.Sum256([]byte(M))
@@ -160,19 +128,20 @@ func main() {
 
 	fmt.Println(Decrypt(encM, *keys))
 
-	signature := SignMessage(m, *keys)
-
-	fmt.Println(Verify(m, keys.public, signature))
-
-	/*keys.public.p.Add(keys.public.p, new(big.Int).SetInt64(5))
+	keys.public.p.Add(keys.public.p, new(big.Int).SetInt64(5)) //damaged p
 	fmt.Println(Decrypt(encM, *keys))
 
 	keys.public.p.Add(keys.public.p, new(big.Int).SetInt64(-5))
 	fmt.Println(Decrypt(encM, *keys))
 
-	keys.private.Add(keys.private, new(big.Int).SetInt64(17))
+	keys.private.Add(keys.private, new(big.Int).SetInt64(17)) //damaged private key
 	fmt.Println(Decrypt(encM, *keys))
 
 	keys.private.Add(keys.private, new(big.Int).SetInt64(-17))
-	fmt.Println(Decrypt(encM, *keys))*/
+	fmt.Println(Decrypt(encM, *keys))
+
+	signature := SignMessage(m, *keys)
+
+	fmt.Println(Verify(m, keys.public, signature))
+	fmt.Println(Verify("hElLo, wOrLd!", keys.public, signature)) //another message same signature
 }
