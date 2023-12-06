@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 )
@@ -16,8 +17,11 @@ type KeyPair struct {
 }
 
 type EncryptedMessage struct {
-	x *big.Int
-	y *big.Int
+	x, y *big.Int
+}
+
+type Signature struct {
+	r, s *big.Int
 }
 
 func GenKeys() *KeyPair {
@@ -69,11 +73,96 @@ func Decrypt(M EncryptedMessage, keys KeyPair) (res string) {
 	return res
 }
 
+func SignMessage(M string, keys KeyPair) (res Signature) {
+	mod := new(big.Int)
+	mod.Sub(keys.public.p, new(big.Int).SetInt64(1))
+
+	k := new(big.Int)
+	for {
+		k, _ = rand.Int(rand.Reader, mod)
+		if k.ModInverse(k, mod) != nil {
+			break
+		}
+	}
+	r := new(big.Int)
+	r.Exp(keys.public.g, k, keys.public.p)
+	res.r = r
+
+	k.ModInverse(k, mod)
+	h := sha256.Sum256([]byte(M))
+
+	t := new(big.Int)
+	t.Mul(keys.private, r)
+	//t.Mod(t, mod)
+	t.Sub(new(big.Int).SetBytes(h[:]), t)
+	t.Mod(t, mod)
+	t.Mul(t, k)
+	t.Mod(t, mod)
+	res.s = t
+
+	return res
+}
+
+/*func Verify(M string, key PublicKey, signature Signature) bool {
+	mod := new(big.Int)
+	mod.Sub(key.p, new(big.Int).SetInt64(1))
+
+	y := new(big.Int)
+	y.ModInverse(key.b, key.p)
+	s := new(big.Int)
+	s.ModInverse(signature.s, mod)
+
+	h := sha256.Sum256([]byte(M))
+
+	t := new(big.Int)
+	t.Mul(new(big.Int).SetBytes(h[:]), s)
+	t.Mod(t, mod)
+	u1 := t
+
+	t.Mul(signature.r, s)
+	t.Mod(t, mod)
+	u2 := t
+
+	u1.Exp(key.g, u1, key.p)
+	u2.Exp(y, u2, key.p)
+	t.Mul(u1, u2)
+	t.Mod(t, key.p)
+
+	fmt.Println(t)
+	fmt.Println(signature.r)
+
+	return t.Cmp(signature.r) == 0
+}*/
+
+func Verify(M string, key PublicKey, signature Signature) bool {
+	h := sha256.Sum256([]byte(M))
+
+	br := new(big.Int)
+	br.Exp(key.b, signature.r, key.p)
+
+	rs := new(big.Int)
+	rs.Exp(signature.r, signature.s, key.p)
+
+	u := new(big.Int)
+	u.Mul(br, rs)
+	u.Mod(u, key.p)
+
+	gm := new(big.Int)
+	gm.Exp(key.g, new(big.Int).SetBytes(h[:]), key.p)
+
+	return gm.Cmp(u) == 0
+}
+
 func main() {
+	m := "Hello, World!"
 	keys := GenKeys()
-	encM := Encrypt("Hello, World!", keys.public)
+	encM := Encrypt(m, keys.public)
 
 	fmt.Println(Decrypt(encM, *keys))
+
+	signature := SignMessage(m, *keys)
+
+	fmt.Println(Verify(m, keys.public, signature))
 
 	/*keys.public.p.Add(keys.public.p, new(big.Int).SetInt64(5))
 	fmt.Println(Decrypt(encM, *keys))
